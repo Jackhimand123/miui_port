@@ -1,14 +1,18 @@
-# 需要移植的分区
-partition_to_port=system product system_ext
+# --- RAPHAEL HYPEROS 3 CONFIG ---
 
+# 需要移植的分区 (Only port essential logic for A16 stability)
+partition_to_port=system,system_ext,product
 
-# 可能的super子分区列表
-super_list=vendor mi_ext odm odm_dlkm system system_dlkm vendor_dlkm product product_dlkm system_ext
+# 可能的super子分区列表 (Raphael physical partition map)
+# Note: We keep vendor and odm from the Base ROM for hardware compatibility
+super_list=system,system_ext,product,vendor,odm,mi_ext
 
-
-# 打包为 ext4 文件系统（如果底包是erofs） true:是  false:否    意义：解锁system
+# 打包为 ext4 文件系统 (True: Required to make system writable/Gaming tweaks)
 repack_with_ext4=true
 
-
-# 去除data加密   true:是  false:否
+# 去除data加密 (True: Recommended for custom ROMs to avoid TWRP/OrangeFox lock)
 remove_data_encryption=true
+
+# --- RAPHAEL SPECIFIC SIZE LIMIT ---
+# The K20 Pro has a 9.1GB limit. If build fails, we must debloat further.
+super_size=9126805504
