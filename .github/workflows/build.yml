@@ -1,0 +1,39 @@
+name: Raphael HyperOS 3 Port
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base ROM Link (K20 Pro A11)'
+        required: true
+        default: 'https://bigota.d.miui.com/V12.5.6.0.RFKCNXM/miui_RAPHAEL_V12.5.6.0.RFKCNXM_d2f7f9f2e3_11.0.zip'
+      port_url:
+        description: 'Port ROM Link (HyperOS 3 A16)'
+        required: true
+        default: 'https://bigota.d.miui.com/OS3.0.3.0.WOCTWXM/miui_DADA_OS3.0.3.0.WOCTWXM_7d2f9a1b_16.0.zip'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aria2 zip p7zip-full python3 bc
+          # Give execution permissions to your toolset
+          chmod -R +x bin/
+          chmod +x port.sh
+
+      - name: Run Porting Script
+        run: |
+          # Executes your script using the links from the UI
+          ./port.sh "${{ github.event.inputs.base_url }}" "${{ github.event.inputs.port_url }}"
+
+      - name: Upload Flashable ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: Raphael-HyperOS3-A16-Gaming
+          path: "*.zip"
+          compression-level: 0 # Fast upload for large ROM files
