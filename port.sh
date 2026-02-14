@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# miui_port project for Raphael (K20 Pro)
-# Optimized for SourceForge & Mirror redirects
-
+# Configuration for Raphael (K20 Pro) - HyperOS 3.0 / A16
 BASEROM="$1"
 PORTROM="$2"
 
@@ -12,51 +10,53 @@ export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$PATH
 Yellow() { echo -e \[$(date +%m%d-%T)\] "\e[1;33m"$@"\e[0m"; }
 Green() { echo -e \[$(date +%m%d-%T)\] "\e[1;32m"$@"\e[0m"; }
 
-# --- DOWNLOAD LOGIC ---
-Yellow "Cleaning up workspace..."
+# --- CLEANUP & PREP ---
+Yellow "Preparing Workspace..."
 rm -rf BASEROM/ PORTROM/ images/ *.zip
 mkdir -p BASEROM/images/ PORTROM/images/ images/
 
-# Use wget for Base ROM (Better at handling the redirect from xiaomistockrom)
-if [ ! -f "base.zip" ]; then
-    Yellow "Downloading Base ROM via wget..."
-    wget -U "Mozilla/5.0" -O base.zip "${BASEROM}"
-fi
-
-# Use aria2c for Port ROM (SourceForge usually works with direct URL + user agent)
-if [ ! -f "port.zip" ]; then
-    Yellow "Downloading Port ROM via aria2c..."
-    aria2c --user-agent="Mozilla/5.0" -s10 -x10 -o port.zip "${PORTROM}"
-fi
+# --- DOWNLOAD ---
+Yellow "Downloading ROMs..."
+# Using -L for redirects and -A for browser impersonation
+aria2c -s16 -x16 -L -A "Mozilla/5.0" -o base.zip "$BASEROM"
+aria2c -s16 -x16 -L -A "Mozilla/5.0" -o port.zip "$PORTROM"
 
 # --- EXTRACTION ---
 Yellow "Extracting ROMs..."
-# Base
-unzip -q base.zip payload.bin -d BASEROM/ || unzip -q base.zip "images/*" -d BASEROM/
-if [ -f "BASEROM/payload.bin" ]; then
-    payload-dumper-go -o BASEROM/images/ BASEROM/payload.bin
-fi
+unzip -q base.zip payload.bin -d BASEROM/
+payload-dumper-go -o BASEROM/images/ BASEROM/payload.bin
 
-# Port
-unzip -q port.zip payload.bin -d PORTROM/ || unzip -q port.zip "images/*" -d PORTROM/
-if [ -f "PORTROM/payload.bin" ]; then
-    payload-dumper-go -o PORTROM/images/ PORTROM/payload.bin
-fi
+unzip -q port.zip payload.bin -d PORTROM/
+payload-dumper-go -o PORTROM/images/ PORTROM/payload.bin
 
-# --- VERIFY FILES ---
-if [ ! -f "PORTROM/images/system.img" ]; then
-    echo "ERROR: Extraction failed. Images not found."
-    exit 1
-fi
+# --- EXTREME DEBLOAT (Mandatory for K20 Pro Space) ---
+Yellow "Debloating Rodin System for Space..."
+# Product Partition Cleanup
+rm -rf PORTROM/images/product/app/XiaomiVideo
+rm -rf PORTROM/images/product/app/MiBrowserGlobal
+rm -rf PORTROM/images/product/app/Mipay
+rm -rf PORTROM/images/product/app/MSA
+rm -rf PORTROM/images/product/priv-app/Joyose
+# System Partition Cleanup
+rm -rf PORTROM/images/system/system/app/Keep
+rm -rf PORTROM/images/system/system/app/Editors
 
-# --- MODS & REPACK ---
-Yellow "Applying Raphael Gaming Mods..."
-# (Keeping your existing performance tweaks here)
+# --- ANDROID 16 PATCHES ---
+Yellow "Applying Android 16 Mount & Encryption Patches..."
+for fstab in $(find BASEROM/images/vendor/etc/ -name "fstab.qcom"); do
+    sed -i 's/fileencryption=ice/encryptable=footer/g' $fstab
+done
+
+# --- PERFORMANCE TWEAKS ---
 target_prop="BASEROM/images/system/system/build.prop"
-echo "persist.vendor.qti.games.gt.prof=1" >> "$target_prop"
-echo "persist.sys.performance_level=3" >> "$target_prop"
+{
+    echo "persist.vendor.qti.games.gt.prof=1"
+    echo "persist.sys.performance_level=3"
+    echo "ro.config.low_ram=false"
+} >> "$target_prop"
 
-Yellow "Generating Super.img..."
+# --- REPACKING ---
+Yellow "Repacking Super.img (9.1GB Limit)..."
 system_size=$(stat -c%s PORTROM/images/system.img)
 product_size=$(stat -c%s PORTROM/images/product.img)
 system_ext_size=$(stat -c%s PORTROM/images/system_ext.img)
@@ -74,13 +74,15 @@ lpmake --metadata-size 65536 --super-name super --metadata-slots 2 --device supe
        --partition odm:readonly:$odm_size:raphael_dynamic_partitions --image odm=BASEROM/images/odm.img \
        --sparse --output images/super.img
 
+# Copying critical boot files
 cp BASEROM/images/boot.img images/
 cp BASEROM/images/dtbo.img images/
 cp BASEROM/images/vbmeta*.img images/
 
-Yellow "Finalizing ZIP..."
+# --- FINAL ZIP ---
+Yellow "Creating Flashable Zip..."
 cd images/
-zip -r ../Raphael_HyperOS3_A16.zip ./*
+zip -r ../Raphael_HOS3_A16_Final.zip ./*
 cd ..
 
-Green "Build Successful! File: Raphael_HyperOS3_A16.zip"
+Green "Build Successful!"
