@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # miui_port project for Raphael (K20 Pro)
-# Target: HyperOS 3.1 (Android 16)
+# Target: HyperOS 3.0 (Android 16)
 # Optimization: Extreme Gaming Performance
 
 BASEROM="$1"
@@ -30,7 +30,7 @@ fi
 # --- EXTRACTION ---
 Yellow "Cleaning up workspace..."
 rm -rf BASEROM/ PORTROM/ images/ 
-mkdir -p BASEROM/images/ PORTROM/images/
+mkdir -p BASEROM/images/ PORTROM/images/ images/
 
 Yellow "Extracting Payload..."
 unzip ${BASEROM} payload.bin -d BASEROM/
@@ -61,27 +61,58 @@ target_prop="BASEROM/images/system/system/build.prop"
 } >> "$target_prop"
 
 # 3. Extreme Debloating for Android 16 Space
-Yellow "Extreme Debloating for Android 16 Space..."
-# Remove Joyose (Performance Limiter)
+Yellow "Extreme Debloating for Space..."
 rm -rf PORTROM/images/product/app/Joyose
 rm -rf PORTROM/images/product/priv-app/Joyose
-# Remove Heavy Bloatware
 rm -rf PORTROM/images/product/app/MiuiVideo
 rm -rf PORTROM/images/product/app/MiBrowserGlobal
 rm -rf PORTROM/images/product/app/XiaomiTrends
 rm -rf PORTROM/images/system/system/app/Keep
 rm -rf PORTROM/images/product/priv-app/Mipay
-# Remove Tracking/Analytics
 rm -rf PORTROM/images/product/app/MSA
 rm -rf PORTROM/images/product/priv-app/AnalyticsCore
 
-# 4. Android 16 Compatibility Patch
+# 4. Android 16 Compatibility Patch (Vendor fstab)
 for fstab in $(find BASEROM/images/vendor/etc/ -name "fstab.qcom"); do
     sed -i 's/fileencryption=ice/encryptable=footer/g' $fstab
 done
 
-# --- REPACKING ---
-Yellow "Repacking Images for Raphael..."
-# [Repacking commands using bin/lpmake follow here]
+# --- REPACKING FOR RAPHAEL (SUPER.IMG) ---
+Yellow "Generating Super.img for Raphael..."
 
-Green "Build Process Finished! Ready for flashing."
+# Get image sizes
+system_size=$(stat -c%s PORTROM/images/system.img)
+product_size=$(stat -c%s PORTROM/images/product.img)
+system_ext_size=$(stat -c%s PORTROM/images/system_ext.img)
+vendor_size=$(stat -c%s BASEROM/images/vendor.img)
+odm_size=$(stat -c%s BASEROM/images/odm.img)
+
+# Sum total size with a buffer (100MB)
+group_size=$((system_size + product_size + system_ext_size + vendor_size + odm_size + 104857600))
+
+# Execute lpmake (Ensuring images are in the right folder for the flashable zip)
+lpmake --metadata-size 65536 \
+       --super-name super \
+       --metadata-slots 2 \
+       --device super:9126805504 \
+       --group raphael_dynamic_partitions:$group_size \
+       --partition system:readonly:$system_size:raphael_dynamic_partitions --image system=PORTROM/images/system.img \
+       --partition product:readonly:$product_size:raphael_dynamic_partitions --image product=PORTROM/images/product.img \
+       --partition system_ext:readonly:$system_ext_size:raphael_dynamic_partitions --image system_ext=PORTROM/images/system_ext.img \
+       --partition vendor:readonly:$vendor_size:raphael_dynamic_partitions --image vendor=BASEROM/images/vendor.img \
+       --partition odm:readonly:$odm_size:raphael_dynamic_partitions --image odm=BASEROM/images/odm.img \
+       --sparse \
+       --output images/super.img
+
+# Move individual firmware images needed for flash
+cp BASEROM/images/boot.img images/
+cp BASEROM/images/dtbo.img images/
+cp BASEROM/images/vbmeta*.img images/
+
+# --- FINAL ZIP PACKAGE ---
+Yellow "Zipping flashable ROM..."
+cd images/
+zip -r ../Raphael_HyperOS3_A16_Gaming.zip ./*
+cd ..
+
+Green "Build Successful! ROM: Raphael_HyperOS3_A16_Gaming.zip"
