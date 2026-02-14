@@ -1,15 +1,6 @@
-name: Raphael HyperOS 3 Porting
+name: Raphael HyperOS 3 (K70 Pro Port)
 on:
   workflow_dispatch:
-    inputs:
-      base_url:
-        description: 'Base ROM Link (MIUI 12.5 Raphael)'
-        required: true
-        default: 'https://xiaomistockrom.com/wp-content/uploads/miui_RAPHAEL_V12.5.6.0.RFKCNXM_d2f7f9f2e3_11.0.zip'
-      port_url:
-        description: 'Port ROM Link (HyperOS 3 SourceForge)'
-        required: true
-        default: 'https://sourceforge.net/projects/xiaomi-eu-multilang-miui-roms/files/xiaomi.eu/HyperOS-STABLE-RELEASES/HyperOS3.0/xiaomi.eu_MIRO_OS3.0.6.0.WOMCNXM_16.zip/download'
 
 jobs:
   build:
@@ -18,24 +9,19 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Environment
+      - name: Setup Runner
         run: |
           sudo apt-get update
           sudo apt-get install -y aria2 zip p7zip-full python3 bc
-          # Fix permissions for the bin folder and port script
           chmod -R +x bin/
           chmod +x port.sh
 
-      - name: Execute Porting Script
+      - name: Start Build
         run: |
-          # Pass the links from the input boxes to the script
-          ./port.sh "${{ github.event.inputs.base_url }}" "${{ github.event.inputs.port_url }}"
+          ./port.sh "https://cdnorg.d.miui.com/V12.5.1.0.RFKINXM/miui_RAPHAELININGlobal_V12.5.1.0.RFKINXM_0bfe71d0cd_11.0.zip" "https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS3.0.4.0.WOJCNXM/rodin-ota_full-OS3.0.4.0.WOJCNXM-user-16.0-5c06cb9174.zip"
 
-      - name: Upload Finished ROM
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Raphael-HyperOS3-A16-Gaming
-          # This looks for any zip in the main folder created by the script
+          name: K20Pro-HyperOS3-A16
           path: "*.zip"
-          if-no-files-found: error
-          compression-level: 0
